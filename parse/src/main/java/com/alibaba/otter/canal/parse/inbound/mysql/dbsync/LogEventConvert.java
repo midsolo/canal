@@ -48,10 +48,7 @@ import com.taobao.tddl.dbsync.binlog.event.mariadb.MariaGtidLogEvent;
 import com.taobao.tddl.dbsync.binlog.exception.TableIdNotFoundException;
 
 /**
- * 基于{@linkplain LogEvent}转化为Entry对象的处理
- * 
- * @author jianghang 2013-1-17 下午02:41:14
- * @version 1.0.0
+ * 负责将LogEvent转为CanalEntry.Entry
  */
 public class LogEventConvert extends AbstractCanalLifeCycle implements BinlogParser<LogEvent> {
 
@@ -73,7 +70,9 @@ public class LogEventConvert extends AbstractCanalLifeCycle implements BinlogPar
     public static final String          COMMIT              = "COMMIT";
     public static final Logger          logger              = LoggerFactory.getLogger(LogEventConvert.class);
 
-    private volatile AviaterRegexFilter nameFilter;                                                          // 运行时引用可能会有变化，比如规则发生变化时
+    // 白名单过滤：设置到parser中的eventFilter，在default-instance中配置
+    private volatile AviaterRegexFilter nameFilter;
+    // 黑名单过滤：设置到parser中的nameBlackFilter，在default-instance中配置
     private volatile AviaterRegexFilter nameBlackFilter;
     private Map<String, List<String>>   fieldFilterMap      = new HashMap<>();
     private Map<String, List<String>>   fieldBlackFilterMap = new HashMap<>();

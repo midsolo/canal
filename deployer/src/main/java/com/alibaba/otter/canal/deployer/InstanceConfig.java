@@ -6,17 +6,16 @@ import com.alibaba.otter.canal.common.utils.CanalToStringStyle;
 
 /**
  * 启动的相关配置
- * 
- * @author jianghang 2012-11-8 下午02:50:54
- * @version 1.0.0
  */
 public class InstanceConfig {
 
-    private InstanceConfig globalConfig;
-    private InstanceMode   mode;
-    private Boolean        lazy;
-    private String         managerAddress;
-    private String         springXml;
+    private InstanceConfig globalConfig;  // 全局配置（父配置）
+    private InstanceMode   mode;          // 实例模式：SPRING/MANAGER
+    private Boolean        lazy;          // 是否延迟启动
+    private String         managerAddress;// Manager地址
+    private String         springXml;     // Spring配置文件路径
+    // ======== 配置继承机制 ========
+    // 如果当前实例没有配置某个属性，则从 globalConfig 中获取
 
     public InstanceConfig(){
 
@@ -40,9 +39,9 @@ public class InstanceConfig {
 
     public Boolean getLazy() {
         if (lazy == null && globalConfig != null) {
-            return globalConfig.getLazy();
+            return globalConfig.getLazy(); // 使用全局配置
         } else {
-            return lazy;
+            return lazy;                   // 使用实例配置
         }
     }
 

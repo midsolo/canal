@@ -23,35 +23,41 @@ import com.google.common.collect.MapMaker;
 import com.google.common.collect.MigrateMap;
 
 /**
- * 监听基于spring配置的instance变化
- * 
- * @author jianghang 2013-2-6 下午06:23:55
- * @version 1.0.1
+ * 本地配置动态监控机制：监听基于Spring配置的instance变化。
+ * 每5秒扫描一次，如果配置文件有变化，则通知对应的action进行实例操作。
+ * 支持：
+ *   - 新增实例：自动启动
+ *   - 删除实例：自动停止
+ *   - 修改实例：自动重载
+ * 每5秒扫描 {canal.conf.dir}/{destination}/目录                           │
+ * 监控文件: instance.properties
  */
 public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implements InstanceConfigMonitor, CanalLifeCycle {
+    private static final Logger logger = LoggerFactory.getLogger(SpringInstanceConfigMonitor.class);
 
-    private static final Logger              logger               = LoggerFactory.getLogger(SpringInstanceConfigMonitor.class);
-    private String                           rootConf;
-    // 扫描周期，单位秒
-    private long                             scanIntervalInSecond = 5;
-    private InstanceAction                   defaultAction        = null;
-    private Map<String, InstanceAction>      actions              = new MapMaker().makeMap();
-    private Map<String, InstanceConfigFiles> lastFiles            = MigrateMap.makeComputingMap(InstanceConfigFiles::new);
-    private ScheduledExecutorService         executor             = Executors.newScheduledThreadPool(1,
-                                                                      new NamedThreadFactory("canal-instance-scan"));
+    private String rootConf;
+    private long scanIntervalInSecond = 5; // 扫描周期，单位秒
+    private InstanceAction defaultAction = null;
+    private Map<String, InstanceAction> actions = new MapMaker().makeMap();
+    private Map<String, InstanceConfigFiles> lastFiles = MigrateMap.makeComputingMap(InstanceConfigFiles::new);
+    private ScheduledExecutorService executor = Executors.newScheduledThreadPool(
+            1, new NamedThreadFactory("canal-instance-scan"));
 
-    private volatile boolean                 isFirst              = true;
+    private volatile boolean isFirst = true;
 
     public Map<String, InstanceAction> getActions() {
         return actions;
     }
 
+    @Override
     public void start() {
         super.start();
         Assert.notNull(rootConf, "root conf dir is null!");
 
+        // 启动定时扫描线程，默认每5秒扫描一次
         executor.scheduleWithFixedDelay(() -> {
             try {
+                // 扫描配置文件变化
                 scan();
                 if (isFirst) {
                     isFirst = false;
@@ -62,6 +68,7 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
         }, 0, scanIntervalInSecond, TimeUnit.SECONDS);
     }
 
+    @Override
     public void stop() {
         super.stop();
         executor.shutdownNow();
@@ -91,30 +98,32 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
             return;
         }
 
+        // ========1. 扫描所有实例目录========
         File[] instanceDirs = rootdir.listFiles(pathname -> {
             String filename = pathname.getName();
+            // 过滤掉spring目录，只保留实例目录
             return pathname.isDirectory() && !"spring".equalsIgnoreCase(filename);
         });
 
         // 扫描目录的新增
         Set<String> currentInstanceNames = new HashSet<>();
 
-        // 判断目录内文件的变化
+        // ========2. 遍历每个实例目录========
         for (File instanceDir : instanceDirs) {
             String destination = instanceDir.getName();
             currentInstanceNames.add(destination);
+            // 只关注instance.properties文件，避免因为.svn或者其他生成的临时文件导致出现reload
             File[] instanceConfigs = instanceDir.listFiles((dir, name) -> {
-                // return !StringUtils.endsWithIgnoreCase(name, ".dat");
-                // 限制一下，只针对instance.properties文件,避免因为.svn或者其他生成的临时文件导致出现reload
                 return StringUtils.equalsIgnoreCase(name, "instance.properties");
             });
 
             if (!actions.containsKey(destination) && instanceConfigs.length > 0) {
-                // 存在合法的instance.properties，并且第一次添加时，进行启动操作
+                // ========新增实例：启动========
                 notifyStart(instanceDir, destination, instanceConfigs);
             } else if (actions.containsKey(destination)) {
-                // 历史已经启动过
-                if (instanceConfigs.length == 0) { // 如果不存在合法的instance.properties
+                // ========已存在的实例：检查配置是否变化========
+                if (instanceConfigs.length == 0) {
+                    // 配置文件被删除：停止实例
                     notifyStop(destination);
                 } else {
                     InstanceConfigFiles lastFile = lastFiles.get(destination);
@@ -124,13 +133,13 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
                     }
 
                     boolean hasChanged = judgeFileChanged(instanceConfigs, lastFile.getInstanceFiles());
-                    // 通知变化
+                    // 配置文件有变化：重载实例
                     if (hasChanged) {
                         notifyReload(destination);
                     }
 
+                    // 更新文件修改时间记录
                     if (hasChanged || CollectionUtils.isEmpty(lastFile.getInstanceFiles())) {
-                        // 更新内容
                         List<FileInfo> newFileInfo = new ArrayList<>();
                         for (File instanceConfig : instanceConfigs) {
                             newFileInfo.add(new FileInfo(instanceConfig.getName(), instanceConfig.lastModified()));
@@ -143,7 +152,7 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
 
         }
 
-        // 判断目录是否删除
+        // ========3. 检查是否有实例目录被删除========
         Set<String> deleteInstanceNames = new HashSet<>();
         for (String destination : actions.keySet()) {
             if (!currentInstanceNames.contains(destination)) {
@@ -151,7 +160,7 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
             }
         }
         for (String deleteInstanceName : deleteInstanceNames) {
-            notifyStop(deleteInstanceName);
+            notifyStop(deleteInstanceName); // 停止已删除的实例
         }
     }
 
@@ -222,14 +231,14 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
 
     public static class InstanceConfigFiles {
 
-        private String         destination;                              // instance
-                                                                          // name
-        private List<FileInfo> springFile    = new ArrayList<>(); // spring的instance
-                                                                          // xml
-        private FileInfo       rootFile;                                 // canal.properties
+        private String destination;                              // instance
+        // name
+        private List<FileInfo> springFile = new ArrayList<>(); // spring的instance
+        // xml
+        private FileInfo rootFile;                                 // canal.properties
         private List<FileInfo> instanceFiles = new ArrayList<>(); // instance对应的配置
 
-        public InstanceConfigFiles(String destination){
+        public InstanceConfigFiles(String destination) {
             this.destination = destination;
         }
 
@@ -270,9 +279,9 @@ public class SpringInstanceConfigMonitor extends AbstractCanalLifeCycle implemen
     public static class FileInfo {
 
         private String name;
-        private long   lastModified = 0;
+        private long lastModified = 0;
 
-        public FileInfo(String name, long lastModified){
+        public FileInfo(String name, long lastModified) {
             this.name = name;
             this.lastModified = lastModified;
         }

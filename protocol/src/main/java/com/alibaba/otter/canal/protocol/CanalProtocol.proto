@@ -5,150 +5,163 @@ option java_package = "com.alibaba.otter.canal.protocol";
 option java_outer_classname = "CanalPacket";
 option optimize_for = SPEED;
 
+// =====通信协议=====
+// 使用proto3语法，oneof处理可选字段，保留COMPATIBLEPROTO2=0向前兼容proto2
+
 enum Compression {
-    COMPRESSIONCOMPATIBLEPROTO2 = 0;
-    NONE = 1;
-    ZLIB = 2;
-    GZIP = 3;
-    LZF = 4;
+  COMPRESSIONCOMPATIBLEPROTO2 = 0;
+
+  NONE = 1;
+  ZLIB = 2;
+  GZIP = 3;
+  LZF = 4;
 }
 
+// 消息类型枚举PacketType
 enum PacketType {
-    //compatible
-    PACKAGETYPECOMPATIBLEPROTO2 = 0;
-    HANDSHAKE = 1;
-    CLIENTAUTHENTICATION = 2;
-    ACK = 3;
-    SUBSCRIPTION = 4;
-    UNSUBSCRIPTION = 5;
-    GET = 6;
-    MESSAGES = 7;
-    CLIENTACK = 8;
-    // management part
-    SHUTDOWN = 9;
-    // integration
-    DUMP = 10;
-    HEARTBEAT = 11;
-    CLIENTROLLBACK = 12;
+  PACKAGETYPECOMPATIBLEPROTO2 = 0;
+
+  HANDSHAKE = 1;           // 握手请求
+  CLIENTAUTHENTICATION = 2;// 客户端认证
+  ACK = 3;                 // 确认响应
+  SUBSCRIPTION = 4;        // 订阅请求
+  UNSUBSCRIPTION = 5;      // 取消订阅请求
+  GET = 6;                 // 获取数据
+  MESSAGES = 7;            // 返回消息数据
+  CLIENTACK = 8;           // 客户端确认消费
+  SHUTDOWN = 9;            // management part
+  DUMP = 10;               // integration
+  HEARTBEAT = 11;          // 心跳包
+  CLIENTROLLBACK = 12;     // 客户端回滚
 }
 
+// 核心消息包Packet
 message Packet {
-     //[default = 17];
-     oneof magic_number_present {
-         int32 magic_number = 1;
-     }
-     //[default = 1];
-     oneof version_present {
-          int32 version = 2;
-     };
-     PacketType type = 3;
-     //[default = NONE];
-     oneof compression_present {
-          Compression compression = 4;
-     }
-
-     bytes body = 5;
+  // 魔数 [default=17];
+  oneof magic_number_present {
+    int32 magic_number = 1;
+  }
+  // 协议版本 [default=1];
+  oneof version_present {
+    int32 version = 2;
+  };
+  // 消息类型
+  PacketType type = 3;
+  // 压缩方式 [default=NONE];
+  oneof compression_present {
+    Compression compression = 4;
+  }
+  // 消息体
+  bytes body = 5;
 }
 
 message HeartBeat {
-     int64 send_timestamp = 1;
-     int64 start_timestamp = 2;
+  int64 send_timestamp = 1;
+  int64 start_timestamp = 2;
 }
 
+// ===握手与认证===
 message Handshake {
-    //  [default = "utf8"];
-    oneof communication_encoding_present {
-        string communication_encoding = 1;
-    }
-     bytes seeds = 2;
-     Compression supported_compressions = 3;
+  // 编码方式 [default="utf8"]
+  oneof communication_encoding_present {
+    string communication_encoding = 1; // 支持的压缩方式
+  }
+  // 认证种子 (用于加密密码)
+  bytes seeds = 2;
+  // 服务端支持的压缩算法
+  Compression supported_compressions = 3;
 }
-
-// client authentication
+// ===握手与认证===
 message ClientAuth {
-    string username = 1;
-    bytes password = 2; // hashed password with seeds from Handshake message
-    // [default = 0]
-    oneof net_read_timeout_present {
-         int32 net_read_timeout = 3; // in seconds
-    }
-    // [default = 0];
-    oneof net_write_timeout_present {
-        int32 net_write_timeout = 4; // in seconds
-    }
-    string destination = 5;
-    string client_id = 6;
-    string filter = 7;
-    int64 start_timestamp = 8;
+  string username = 1;
+  // 使用seeds加密后的密码
+  bytes password = 2;
+  // 读超时
+  oneof net_read_timeout_present {
+    int32 net_read_timeout = 3;
+  }
+  // 写超时
+  oneof net_write_timeout_present {
+    int32 net_write_timeout = 4;
+  }
+  // 目标实例名
+  string destination = 5;
+  // 客户端标识
+  string client_id = 6;
+  // 数据过滤规则
+  string filter = 7;
+  // 起始时间戳
+  int64 start_timestamp = 8;
 }
 
 message Ack {
-    //[default = 0]
-    oneof error_code_present {
-        int32 error_code = 1;
-    }
-    string error_message = 2; // if something like compression is not supported, erorr_message will tell about it.
+  //[default = 0]
+  oneof error_code_present {
+    int32 error_code = 1;
+  }
+  string error_message = 2; // if something like compression is not supported, erorr_message will tell about it.
 }
 
 message ClientAck {
-    string destination = 1;
-    string client_id = 2;
-    int64 batch_id = 3;
+  string destination = 1;
+  string client_id = 2;
+  int64 batch_id = 3;
 }
 
 // subscription
 message Sub {
-    string destination = 1;
-    string client_id = 2;
-    string filter = 7;
+  string destination = 1;
+  string client_id = 2;
+  string filter = 7;
 }
 
 // Unsubscription
 message Unsub {
-    string destination = 1;
-    string client_id = 2;
-    string filter = 7;
+  string destination = 1;
+  string client_id = 2;
+  string filter = 7;
 }
 
-//  PullRequest
+// 数据获取Get消息
 message Get {
-    string destination = 1;
-    string client_id = 2;
-    int32 fetch_size = 3;
-    //[default = -1]
-    oneof timeout_present {
-        int64 timeout = 4; // 默认-1时代表不控制
-    }
-    //[default = 2]
-    oneof unit_present {
-        int32 unit = 5;// 数字类型，0:纳秒,1:微秒,2:毫秒,3:秒,4:分钟,5:小时,6:天
-    }
-    //[default = false]
-    oneof auto_ack_present {
-        bool auto_ack = 6; // 是否自动ack
-    }
-
+  string destination = 1;
+  string client_id = 2;
+  // 批次大小
+  int32 fetch_size = 3;
+  // 超时时间(-1表示无限等待)
+  oneof timeout_present {
+    int64 timeout = 4;
+  }
+  // 时间单位(0=纳秒...6=天)
+  oneof unit_present {
+    int32 unit = 5;// 数字类型，0:纳秒,1:微秒,2:毫秒,3:秒,4:分钟,5:小时,6:天
+  }
+  // 是否自动确认 [default=false]
+  oneof auto_ack_present {
+    bool auto_ack = 6;
+  }
 }
 
-//
+// 消息返回Messages消息
 message Messages {
-	int64 batch_id = 1;
-    repeated bytes messages = 2;
+  // 消息批次ID
+  int64 batch_id = 1;
+  // Entry序列化后的字节数组
+  repeated bytes messages = 2;
 }
 
 // TBD when new packets are required
 message Dump{
-    string journal = 1;
-    int64  position = 2;
-    // [default = 0]
-    oneof timestamp_present {
-        int64 timestamp = 3;
-    }
-
+  string journal = 1;
+  int64  position = 2;
+  // [default = 0]
+  oneof timestamp_present {
+    int64 timestamp = 3;
+  }
 }
 
 message ClientRollback{
-    string destination = 1;
-    string client_id = 2;
-    int64 batch_id = 3;
+  string destination = 1;
+  string client_id = 2;
+  int64 batch_id = 3;
 }

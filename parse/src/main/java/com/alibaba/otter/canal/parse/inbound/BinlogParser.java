@@ -6,8 +6,6 @@ import com.alibaba.otter.canal.protocol.CanalEntry;
 
 /**
  * 解析binlog的接口
- * 
- * @author: yuanzu Date: 12-9-20 Time: 下午8:46
  */
 public interface BinlogParser<T> extends CanalLifeCycle {
 

@@ -11,9 +11,6 @@ import com.alibaba.otter.canal.common.zookeeper.ZkClientx;
 
 /**
  * canal connectors创建工具类
- * 
- * @author jianghang 2012-10-29 下午11:18:50
- * @version 1.0.0
  */
 public class CanalConnectors {
 
@@ -26,8 +23,8 @@ public class CanalConnectors {
      * @param password
      * @return
      */
-    public static CanalConnector newSingleConnector(SocketAddress address, String destination, String username,
-                                                    String password) {
+    public static CanalConnector newSingleConnector(SocketAddress address, String destination,
+                                                    String username, String password) {
         SimpleCanalConnector canalConnector = new SimpleCanalConnector(address, username, password, destination);
         canalConnector.setSoTimeout(60 * 1000);
         canalConnector.setIdleTimeout(60 * 60 * 1000);
@@ -46,9 +43,7 @@ public class CanalConnectors {
     public static CanalConnector newClusterConnector(List<? extends SocketAddress> addresses, String destination,
                                                      String username, String password) {
         ClusterCanalConnector canalConnector = new ClusterCanalConnector(username,
-            password,
-            destination,
-            new SimpleNodeAccessStrategy(addresses));
+            password, destination, new SimpleNodeAccessStrategy(addresses));
         canalConnector.setSoTimeout(60 * 1000);
         canalConnector.setIdleTimeout(60 * 60 * 1000);
         return canalConnector;
@@ -73,4 +68,5 @@ public class CanalConnectors {
         canalConnector.setIdleTimeout(60 * 60 * 1000);
         return canalConnector;
     }
+
 }

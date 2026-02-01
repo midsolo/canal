@@ -3,10 +3,7 @@ package com.alibaba.otter.canal.sink.exception;
 import com.alibaba.otter.canal.common.CanalException;
 
 /**
- * canal 异常定义
- * 
- * @author jianghang 2012-6-15 下午04:57:35
- * @version 1.0.0
+ * CanalSink组件异常定义
  */
 public class CanalSinkException extends CanalException {
 

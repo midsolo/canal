@@ -28,44 +28,42 @@ import com.taobao.tddl.dbsync.binlog.event.*;
 
 /**
  * 针对解析器提供一个多阶段协同的处理
- * 
+ *
  * <pre>
  * 1. 网络接收 (单线程)
  * 2. 事件基本解析 (单线程，事件类型、DDL解析构造TableMeta、维护位点信息)
  * 3. 事件深度解析 (多线程, DML事件数据的完整解析)
  * 4. 投递到store (单线程)
  * </pre>
- * 
- * @author agapple 2018年7月3日 下午4:54:17
- * @since 1.0.26
  */
 public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implements MultiStageCoprocessor {
 
-    private static final int                  maxFullTimes    = 10;
-    private LogEventConvert                   logEventConvert;
-    private EventTransactionBuffer            transactionBuffer;
-    private ErosaConnection                   connection;
+    private static final int maxFullTimes = 10;
+    private LogEventConvert logEventConvert;
+    private EventTransactionBuffer transactionBuffer;
+    private ErosaConnection connection;
 
-    private int                               parserThreadCount;
-    private int                               ringBufferSize;
-    private RingBuffer<MessageEvent>          disruptorMsgBuffer;
-    private ExecutorService                   parserExecutor;
-    private ExecutorService                   stageExecutor;
-    private String                            destination;
-    private volatile CanalParseException      exception;
-    private AtomicLong                        eventsPublishBlockingTime;
-    private GTIDSet                           gtidSet;
-    private WorkerPool<MessageEvent>          workerPool;
+    private int parserThreadCount;
+    private int ringBufferSize;
+    private RingBuffer<MessageEvent> disruptorMsgBuffer;
+    private ExecutorService parserExecutor;
+    private ExecutorService stageExecutor;
+    private String destination;
+    private volatile CanalParseException exception;
+    private AtomicLong eventsPublishBlockingTime;
+    private GTIDSet gtidSet;
+    private WorkerPool<MessageEvent> workerPool;
     private BatchEventProcessor<MessageEvent> simpleParserStage;
     private BatchEventProcessor<MessageEvent> sinkStoreStage;
-    private LogContext                        logContext;
-    protected boolean                         filterDmlInsert = false;
-    protected boolean                         filterDmlUpdate = false;
-    protected boolean                         filterDmlDelete = false;
+    private LogContext logContext;
+    protected boolean filterDmlInsert = false;
+    protected boolean filterDmlUpdate = false;
+    protected boolean filterDmlDelete = false;
 
-    public MysqlMultiStageCoprocessor(int ringBufferSize, int parserThreadCount, LogEventConvert logEventConvert,
-                                      EventTransactionBuffer transactionBuffer, String destination,
-                                      boolean filterDmlInsert, boolean filterDmlUpdate, boolean filterDmlDelete){
+    public MysqlMultiStageCoprocessor(int ringBufferSize, int parserThreadCount,
+           LogEventConvert logEventConvert, EventTransactionBuffer transactionBuffer,
+           String destination, boolean filterDmlInsert, boolean filterDmlUpdate,
+           boolean filterDmlDelete) {
         this.ringBufferSize = ringBufferSize;
         this.parserThreadCount = parserThreadCount;
         this.logEventConvert = logEventConvert;
@@ -80,39 +78,31 @@ public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implement
     public void start() {
         super.start();
         this.exception = null;
-        this.disruptorMsgBuffer = RingBuffer.createSingleProducer(new MessageEventFactory(),
-            ringBufferSize,
-            new BlockingWaitStrategy());
+        this.disruptorMsgBuffer = RingBuffer.createSingleProducer(new MessageEventFactory(), ringBufferSize, new BlockingWaitStrategy());
         int tc = parserThreadCount > 0 ? parserThreadCount : 1;
-        this.parserExecutor = Executors.newFixedThreadPool(tc, new NamedThreadFactory("MultiStageCoprocessor-Parser-"
-                                                                                      + destination));
+        this.parserExecutor = Executors.newFixedThreadPool(tc, new NamedThreadFactory("MultiStageCoprocessor-Parser-" + destination));
 
-        this.stageExecutor = Executors.newFixedThreadPool(2, new NamedThreadFactory("MultiStageCoprocessor-other-"
-                                                                                    + destination));
+        this.stageExecutor = Executors.newFixedThreadPool(2, new NamedThreadFactory("MultiStageCoprocessor-other-" + destination));
         SequenceBarrier sequenceBarrier = disruptorMsgBuffer.newBarrier();
         ExceptionHandler exceptionHandler = new SimpleFatalExceptionHandler();
-        // stage 2
+
+        // stage 2：SimpleParserStage → 单线程EventHandler
         this.logContext = new LogContext();
-        simpleParserStage = new BatchEventProcessor<>(disruptorMsgBuffer,
-            sequenceBarrier,
-            new SimpleParserStage(logContext));
+        simpleParserStage = new BatchEventProcessor<>(disruptorMsgBuffer, sequenceBarrier, new SimpleParserStage(logContext));
         simpleParserStage.setExceptionHandler(exceptionHandler);
         disruptorMsgBuffer.addGatingSequences(simpleParserStage.getSequence());
 
-        // stage 3
+        // stage 3：DmlParserStage → 多线程WorkerPool
         SequenceBarrier dmlParserSequenceBarrier = disruptorMsgBuffer.newBarrier(simpleParserStage.getSequence());
         WorkHandler<MessageEvent>[] workHandlers = new DmlParserStage[tc];
         for (int i = 0; i < tc; i++) {
             workHandlers[i] = new DmlParserStage();
         }
-        workerPool = new WorkerPool<MessageEvent>(disruptorMsgBuffer,
-            dmlParserSequenceBarrier,
-            exceptionHandler,
-            workHandlers);
+        workerPool = new WorkerPool<MessageEvent>(disruptorMsgBuffer, dmlParserSequenceBarrier, exceptionHandler, workHandlers);
         Sequence[] sequence = workerPool.getWorkerSequences();
         disruptorMsgBuffer.addGatingSequences(sequence);
 
-        // stage 4
+        // stage 4：SinkStoreStage → 单线程EventHandler
         SequenceBarrier sinkSequenceBarrier = disruptorMsgBuffer.newBarrier(sequence);
         sinkStoreStage = new BatchEventProcessor<>(disruptorMsgBuffer, sinkSequenceBarrier, new SinkStoreStage());
         sinkStoreStage.setExceptionHandler(exceptionHandler);
@@ -245,7 +235,7 @@ public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implement
         private LogDecoder decoder;
         private LogContext context;
 
-        public SimpleParserStage(LogContext context){
+        public SimpleParserStage(LogContext context) {
             decoder = new LogDecoder(LogEvent.UNKNOWN_EVENT, LogEvent.ENUM_END_EVENT);
             this.context = context;
             if (gtidSet != null) {
@@ -350,7 +340,7 @@ public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implement
                         List<CanalEntry.Entry> entrys = Lists.newArrayList();
                         for (int index = 0; index < event.getIterateEvents().size(); index++) {
                             CanalEntry.Entry entry = processEvent(event.getIterateEvents().get(index),
-                                event.getIterateTables().get(index));
+                                    event.getIterateTables().get(index));
                             if (entry != null) {
                                 entrys.add(entry);
                             }
@@ -403,24 +393,26 @@ public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implement
 
     private class SinkStoreStage implements EventHandler<MessageEvent>, LifecycleAware {
 
+        @Override
         public void onEvent(MessageEvent event, long sequence, boolean endOfBatch) throws Exception {
             try {
                 if (event.isNeedIterate()) {
-                    // compress binlog
+                    // compress binlog 处理
                     for (CanalEntry.Entry entry : event.getIterateEntrys()) {
+                        // 相当于SinkFunction中调用
                         transactionBuffer.add(entry);
                     }
                 } else {
                     if (event.getEntry() != null) {
+                        // 相当于SinkFunction中调用
                         transactionBuffer.add(event.getEntry());
                     }
                 }
 
                 LogEvent logEvent = event.getEvent();
                 if (connection instanceof MysqlConnection && logEvent.getSemival() == 1) {
-                    // semi ack回报
-                    ((MysqlConnection) connection).sendSemiAck(logEvent.getHeader().getLogFileName(),
-                        logEvent.getHeader().getLogPos());
+                    // 半同步ACK回复
+                    ((MysqlConnection) connection).sendSemiAck(logEvent.getHeader().getLogFileName(), logEvent.getHeader().getLogPos());
                 }
 
                 // clear for gc
@@ -428,6 +420,7 @@ public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implement
                 event.setEvent(null);
                 event.setTable(null);
                 event.setEntry(null);
+
                 // clear compress binlog events
                 event.setNeedDmlParse(false);
                 event.setNeedIterate(false);
@@ -453,15 +446,15 @@ public class MysqlMultiStageCoprocessor extends AbstractCanalLifeCycle implement
 
     static class MessageEvent {
 
-        private LogBuffer        buffer;
+        private LogBuffer buffer;
         private CanalEntry.Entry entry;
-        private boolean          needDmlParse = false;
-        private TableMeta        table;
-        private LogEvent         event;
-        private boolean                needIterate  = false;
+        private boolean needDmlParse = false;
+        private TableMeta table;
+        private LogEvent event;
+        private boolean needIterate = false;
         // compress binlog
-        private List<LogEvent>         iterateEvents;
-        private List<TableMeta>        iterateTables;
+        private List<LogEvent> iterateEvents;
+        private List<TableMeta> iterateTables;
         private List<CanalEntry.Entry> iterateEntrys;
 
         public LogBuffer getBuffer() {

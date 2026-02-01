@@ -180,31 +180,61 @@ public class MysqlConnection implements ErosaConnection {
     }
 
     public void dump(String binlogfilename, Long binlogPosition, SinkFunction func) throws IOException {
-        updateSettings();
-        loadBinlogChecksum();
-        loadVersionComment();
-        sendRegisterSlave();
+        updateSettings();     // 更新MySQL会话设置
+
+        loadBinlogChecksum(); // 加载binlog校验配置
+        loadVersionComment(); // 识别MySQL版本
+
+        sendRegisterSlave();  // 注册从节点
+
+        // markup → 发送dump命令
         sendBinlogDump(binlogfilename, binlogPosition);
+
+        // 启动网络读取
         DirectLogFetcher fetcher = new DirectLogFetcher(connector.getReceiveBufferSize());
         fetcher.start(connector.getChannel());
+
+        // binlog日志解码器
         LogDecoder decoder = new LogDecoder(LogEvent.UNKNOWN_EVENT, LogEvent.ENUM_END_EVENT);
+
         LogContext context = new LogContext();
         context.setCompatiablePercona(compatiablePercona);
         context.setFormatDescription(new FormatDescriptionLogEvent(4, binlogChecksum));
-        while (fetcher.fetch()) {
-            accumulateReceivedBytes(fetcher.limit());
-            LogEvent event = null;
-            event = decoder.decode(fetcher, context);
 
+        /*
+        ===== 核心循环：每从MySQL读取一个binlog事件就回调一次 =====
+        fetcher.fetch()会阻塞等待MySQL推送的binlog数据，一旦有数据到
+        达，先解码为LogEvent，然后立即回调func.sink(event)。
+        --------------------------------------------------------
+        while(fetcher.fetch())
+            MySQL Binlog ──fetch()──▶ LogBuffer
+               ↓
+            LogDecoder.decode() ───▶ LogEvent (原始binlog事件)
+               ↓
+            ═══════════════════════════════════════════
+            ║  func.sink(event)  ← 回调 SinkFunction  ║
+            ═══════════════════════════════════════════
+               │
+               │   返回 false 则停止dump
+               ▼
+            sendSemiAck() (半同步回报)
+        --------------------------------------------------------
+         */
+        while (fetcher.fetch()) { // ← 从网络读取binlog数据
+            accumulateReceivedBytes(fetcher.limit());
+
+            LogEvent event = null;
+            event = decoder.decode(fetcher, context); // 解码为LogEvent
             if (event == null) {
                 throw new CanalParseException("parse failed");
             }
 
-            if (!func.sink(event)) {
-                break;
+            // ===== 回调 SinkFunction#sink，定义在AbstractEventParser#start中 =====
+            if (!func.sink(event)) { // ← 每个LogEvent触发一次回调
+                break;               // 返回false则停止dump
             }
 
-            if (event.getSemival() == 1) {
+            if (event.getSemival() == 1) { // ← 半同步ACK回复
                 sendSemiAck(context.getLogPosition().getFileName(), context.getLogPosition().getPosition());
             }
         }
@@ -261,16 +291,26 @@ public class MysqlConnection implements ErosaConnection {
         loadBinlogChecksum();
         loadVersionComment();
         sendRegisterSlave();
+
         sendBinlogDump(binlogfilename, binlogPosition);
+
         ((MysqlMultiStageCoprocessor) coprocessor).setConnection(this);
         ((MysqlMultiStageCoprocessor) coprocessor).setBinlogChecksum(binlogChecksum);
         ((MysqlMultiStageCoprocessor) coprocessor).setCompatiablePercona(compatiablePercona);
         try (DirectLogFetcher fetcher = new DirectLogFetcher(connector.getReceiveBufferSize())) {
             fetcher.start(connector.getChannel());
+            /*
+            ===== 核心循环：每从MySQL读取数据就发布到Disruptor =====
+            fetcher.fetch() → coprocessor.publish(buffer)
+              ↓
+            stage1：RingBuffer<MessageEvent> → 单生产者-多消费者
+             */
             while (fetcher.fetch()) {
                 accumulateReceivedBytes(fetcher.limit());
+                // 获取原始buffer（不解码）
                 LogBuffer buffer = fetcher.duplicate();
                 fetcher.consume(fetcher.limit());
+                // 发布到Disruptor RingBuffer，不直接回调SinkFunction
                 if (!coprocessor.publish(buffer)) {
                     break;
                 }

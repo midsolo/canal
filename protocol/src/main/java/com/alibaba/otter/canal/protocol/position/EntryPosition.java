@@ -1,43 +1,38 @@
 package com.alibaba.otter.canal.protocol.position;
 
 /**
- * 数据库对象的唯一标示
- * 
- * @author jianghang 2012-6-14 下午09:20:07
- * @version 1.0.0
+ * 具体的binlog位置
  */
 public class EntryPosition extends TimePosition {
+    private static final long serialVersionUID = 81432665066427482L;
+    public static final int EVENTIDENTITY_SEGMENT = 3;
+    public static final char EVENTIDENTITY_SPLIT = (char) 5;
 
-    private static final long serialVersionUID      = 81432665066427482L;
-    public static final int   EVENTIDENTITY_SEGMENT = 3;
-    public static final char  EVENTIDENTITY_SPLIT   = (char) 5;
+    private boolean included = false; // 是否包含当前position的event
+    private String journalName;       // binlog文件名，如 mysql-bin.000001
+    private Long position;            // binlog位置（偏移量）
+    private Long serverId = null;     // 记录一下位点对应的serverId 【add by agapple at 2016-06-28】
+    private String gtid = null;       // GTID信息（GTID模式）
 
-    private boolean           included              = false;
-    private String            journalName;
-    private Long              position;
-    // add by agapple at 2016-06-28
-    private Long              serverId              = null;              // 记录一下位点对应的serverId
-    private String            gtid                  = null;
-
-    public EntryPosition(){
+    public EntryPosition() {
         super(null);
     }
 
-    public EntryPosition(Long timestamp){
+    public EntryPosition(Long timestamp) {
         this(null, null, timestamp);
     }
 
-    public EntryPosition(String journalName, Long position){
+    public EntryPosition(String journalName, Long position) {
         this(journalName, position, null);
     }
 
-    public EntryPosition(String journalName, Long position, Long timestamp){
+    public EntryPosition(String journalName, Long position, Long timestamp) {
         super(timestamp);
         this.journalName = journalName;
         this.position = position;
     }
 
-    public EntryPosition(String journalName, Long position, Long timestamp, Long serverId){
+    public EntryPosition(String journalName, Long position, Long timestamp, Long serverId) {
         this(journalName, position, timestamp);
         this.serverId = serverId;
     }
@@ -132,7 +127,7 @@ public class EntryPosition extends TimePosition {
 
     /**
      * {@inheritDoc}
-     * 
+     *
      * @see java.lang.Comparable#compareTo(java.lang.Object)
      */
     public int compareTo(EntryPosition o) {

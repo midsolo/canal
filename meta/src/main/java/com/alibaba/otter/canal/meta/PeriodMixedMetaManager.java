@@ -28,9 +28,6 @@ import com.google.common.collect.MigrateMap;
  * 1. 去除batch数据刷新到zk中，切换时batch数据可忽略，重新从头开始获取
  * 2. cursor的更新，启用定时刷新，合并多次请求。如果最近没有变化则不更新
  * </pre>
- * 
- * @author jianghang 2012-9-11 下午02:41:15
- * @version 1.0.0
  */
 public class PeriodMixedMetaManager extends MemoryMetaManager implements CanalMetaManager {
 

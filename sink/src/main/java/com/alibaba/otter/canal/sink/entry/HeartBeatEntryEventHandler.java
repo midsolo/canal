@@ -8,13 +8,11 @@ import com.alibaba.otter.canal.sink.AbstractCanalEventDownStreamHandler;
 import com.alibaba.otter.canal.store.model.Event;
 
 /**
- * 处理一下一下heartbeat数据
- * 
- * @author jianghang 2013-10-8 下午6:03:53
- * @since 1.0.12
+ * 使用#before方法过滤HEARTBEAT事件。
  */
 public class HeartBeatEntryEventHandler extends AbstractCanalEventDownStreamHandler<List<Event>> {
 
+    @Override
     public List<Event> before(List<Event> events) {
         boolean existHeartBeat = false;
         for (Event event : events) {
@@ -34,7 +32,6 @@ public class HeartBeatEntryEventHandler extends AbstractCanalEventDownStreamHand
                     result.add(event);
                 }
             }
-
             return result;
         }
     }

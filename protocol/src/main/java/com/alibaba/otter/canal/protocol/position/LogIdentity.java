@@ -7,19 +7,18 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import com.alibaba.otter.canal.common.utils.CanalToStringStyle;
 
 /**
- * @author jianghang 2012-6-21 上午10:52:02
- * @version 1.0.0
+ * 记录数据产生的来源
  */
 public class LogIdentity extends Position {
-
     private static final long serialVersionUID = 5530225131455662581L;
-    private InetSocketAddress sourceAddress;                          // 链接服务器的地址
-    private Long              slaveId;                                // 对应的slaveId
 
-    public LogIdentity(){
+    private InetSocketAddress sourceAddress;  // MySQL服务器的地址
+    private Long slaveId;                     // 对应的slaveId
+
+    public LogIdentity() {
     }
 
-    public LogIdentity(InetSocketAddress sourceAddress, Long slaveId){
+    public LogIdentity(InetSocketAddress sourceAddress, Long slaveId) {
         this.sourceAddress = sourceAddress;
         this.slaveId = slaveId;
     }

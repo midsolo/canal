@@ -10,11 +10,7 @@ import com.alibaba.otter.canal.protocol.position.Position;
 import com.alibaba.otter.canal.protocol.position.PositionRange;
 
 /**
- * meta信息管理器
- * 
- * @author jianghang 2012-6-14 下午09:28:48
- * @author zebin.xuzb
- * @version 1.0.0
+ * meta信息管理器：管理消费位置，管理订阅关系
  */
 public interface CanalMetaManager extends CanalLifeCycle {
 

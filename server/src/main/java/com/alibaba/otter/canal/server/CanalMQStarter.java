@@ -20,25 +20,22 @@ import com.alibaba.otter.canal.protocol.ClientIdentity;
 import com.alibaba.otter.canal.protocol.Message;
 import com.alibaba.otter.canal.server.embedded.CanalServerWithEmbedded;
 
+/**
+ * 用来启动mqProducer。如果serverMode选择了mq，那么会用canalMQStarter来管理mqProducer，
+ * 将canalServer抓取到的实时变更用mqProducer直接投递到mq。
+ */
 public class CanalMQStarter {
+    private static final Logger logger = LoggerFactory.getLogger(CanalMQStarter.class);
 
-    private static final Logger          logger         = LoggerFactory.getLogger(CanalMQStarter.class);
+    private volatile boolean running = false;
+    private ExecutorService executorService;
+    private CanalMQProducer canalMQProducer;
+    private MQProperties mqProperties;
+    private CanalServerWithEmbedded canalServer;
+    private Map<String, CanalMQRunnable> canalMQWorks = new ConcurrentHashMap<>();
+    private static Thread shutdownThread = null;
 
-    private volatile boolean             running        = false;
-
-    private ExecutorService              executorService;
-
-    private CanalMQProducer              canalMQProducer;
-
-    private MQProperties                 mqProperties;
-
-    private CanalServerWithEmbedded      canalServer;
-
-    private Map<String, CanalMQRunnable> canalMQWorks   = new ConcurrentHashMap<>();
-
-    private static Thread                shutdownThread = null;
-
-    public CanalMQStarter(CanalMQProducer canalMQProducer){
+    public CanalMQStarter(CanalMQProducer canalMQProducer) {
         this.canalMQProducer = canalMQProducer;
     }
 
@@ -174,9 +171,9 @@ public class CanalMQStarter {
                     Message message;
                     if (getTimeout != null && getTimeout > 0) {
                         message = canalServer.getWithoutAck(clientIdentity,
-                            getBatchSize,
-                            getTimeout.longValue(),
-                            TimeUnit.MILLISECONDS);
+                                getBatchSize,
+                                getTimeout.longValue(),
+                                TimeUnit.MILLISECONDS);
                     } else {
                         message = canalServer.getWithoutAck(clientIdentity, getBatchSize);
                     }
@@ -222,15 +219,15 @@ public class CanalMQStarter {
 
         private String destination;
 
-        CanalMQRunnable(String destination){
+        CanalMQRunnable(String destination) {
             this.destination = destination;
         }
 
         private AtomicBoolean running = new AtomicBoolean(true);
 
-        private CountDownLatch latch   = new CountDownLatch(1);
+        private CountDownLatch latch = new CountDownLatch(1);
 
-        private Future         future;
+        private Future future;
 
         @Override
         public void run() {

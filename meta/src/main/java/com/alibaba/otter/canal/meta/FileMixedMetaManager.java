@@ -29,33 +29,31 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MigrateMap;
 
 /**
- * 基于文件刷新的metaManager实现
- * 
+ * 基于文件刷新的metaManager实现，使用meta.dat文件进行数据存储。
+ *
  * <pre>
  * 策略：
  * 1. 先写内存，然后定时刷新数据到File
  * 2. 数据采取overwrite模式(只保留最后一次)，通过logger实施append模式(记录历史版本)
  * </pre>
- * 
- * @author jianghang 2013-4-15 下午05:55:57
- * @version 1.0.4
  */
 public class FileMixedMetaManager extends MemoryMetaManager implements CanalMetaManager {
+    private static final Logger logger = LoggerFactory.getLogger(FileMixedMetaManager.class);
 
-    private static final Logger      logger       = LoggerFactory.getLogger(FileMixedMetaManager.class);
-    private static final Charset     charset      = StandardCharsets.UTF_8;
-    private File                     dataDir;
-    private String                   dataFileName = "meta.dat";
-    private Map<String, File>        dataFileCaches;
+    private static final Charset charset = StandardCharsets.UTF_8;
+    private File dataDir;
+    private String dataFileName = "meta.dat";
+    private Map<String, File> dataFileCaches;
     private ScheduledExecutorService executor;
     @SuppressWarnings("serial")
-    private final Position           nullCursor   = new Position() {
-                                                  };
-    private long                     period       = 1000;                                               // 单位ms
-    private Set<ClientIdentity>      updateCursorTasks;
+    private final Position nullCursor = new Position() {};
+    private long period = 1000; // 单位ms
+    private Set<ClientIdentity> updateCursorTasks;
 
+    @Override
     public void start() {
         super.start();
+
         Assert.notNull(dataDir);
         if (!dataDir.exists()) {
             try {
@@ -96,7 +94,8 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
                     // 定时将内存中的最新值刷到file中，多次变更只刷一次
                     if (logger.isInfoEnabled()) {
                         LogPosition cursor = (LogPosition) getCursor(clientIdentity);
-                        logger.info("clientId:{} cursor:[{},{},{},{},{}] address[{}]", clientIdentity.getClientId(), cursor.getPostion().getJournalName(),
+                        logger.info("clientId:{} cursor:[{},{},{},{},{}] address[{}]",
+                                clientIdentity.getClientId(), cursor.getPostion().getJournalName(),
                                 cursor.getPostion().getPosition(), cursor.getPostion().getTimestamp(),
                                 cursor.getPostion().getServerId(), cursor.getPostion().getGtid(),
                                 cursor.getIdentity().getSourceAddress().toString());
@@ -106,13 +105,10 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
                     // ignore
                     logger.error("period update" + clientIdentity.toString() + " curosr failed!", e);
                 }
-            }
-        },
-            period,
-            period,
-            TimeUnit.MILLISECONDS);
+            }}, period, period, TimeUnit.MILLISECONDS);
     }
 
+    @Override
     public void stop() {
         flushDataToFile();// 刷新数据
 
@@ -122,6 +118,7 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
         batches.clear();
     }
 
+    @Override
     public void subscribe(final ClientIdentity clientIdentity) throws CanalMetaManagerException {
         super.subscribe(clientIdentity);
 
@@ -129,6 +126,7 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
         executor.submit(() -> flushDataToFile(clientIdentity.getDestination()));
     }
 
+    @Override
     public void unsubscribe(final ClientIdentity clientIdentity) throws CanalMetaManagerException {
         super.unsubscribe(clientIdentity);
 
@@ -136,11 +134,13 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
         executor.submit(() -> flushDataToFile(clientIdentity.getDestination()));
     }
 
+    @Override
     public void updateCursor(ClientIdentity clientIdentity, Position position) throws CanalMetaManagerException {
         updateCursorTasks.add(clientIdentity);// 添加到任务队列中进行触发
         super.updateCursor(clientIdentity, position);
     }
 
+    @Override
     public Position getCursor(ClientIdentity clientIdentity) throws CanalMetaManagerException {
         Position position = super.getCursor(clientIdentity);
         if (position == nullCursor) {
@@ -209,9 +209,9 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
 
                 data.setClientDatas(clientDatas);
             }
-            //fixed issue https://github.com/alibaba/canal/issues/4312
-            //客户端数据为空时不覆盖文件内容 （适合单客户端）
-            if(data.getClientDatas().isEmpty()){
+            // fixed issue https://github.com/alibaba/canal/issues/4312
+            // 客户端数据为空时不覆盖文件内容 （适合单客户端）
+            if (data.getClientDatas().isEmpty()) {
                 return;
             }
             String json = JsonUtils.marshalToString(data);
@@ -267,21 +267,21 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
 
     /**
      * 描述一个clientIdentity对应的数据对象
-     * 
+     *
      * @author jianghang 2013-4-15 下午06:19:40
      * @version 1.0.4
      */
     public static class FileMetaClientIdentityData {
 
         private ClientIdentity clientIdentity;
-        private LogPosition    cursor;
+        private LogPosition cursor;
 
-        public FileMetaClientIdentityData(){
+        public FileMetaClientIdentityData() {
 
         }
 
         public FileMetaClientIdentityData(ClientIdentity clientIdentity, MemoryClientIdentityBatch batch,
-                                          LogPosition cursor){
+                                          LogPosition cursor) {
             this.clientIdentity = clientIdentity;
             this.cursor = cursor;
         }
@@ -306,20 +306,20 @@ public class FileMixedMetaManager extends MemoryMetaManager implements CanalMeta
 
     /**
      * 描述整个canal instance对应数据对象
-     * 
+     *
      * @author jianghang 2013-4-15 下午06:20:22
      * @version 1.0.4
      */
     public static class FileMetaInstanceData {
 
-        private String                           destination;
+        private String destination;
         private List<FileMetaClientIdentityData> clientDatas;
 
-        public FileMetaInstanceData(){
+        public FileMetaInstanceData() {
 
         }
 
-        public FileMetaInstanceData(String destination, List<FileMetaClientIdentityData> clientDatas){
+        public FileMetaInstanceData(String destination, List<FileMetaClientIdentityData> clientDatas) {
             this.destination = destination;
             this.clientDatas = clientDatas;
         }

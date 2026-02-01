@@ -1,0 +1,94 @@
+#################################################
+#####MySQL连接标识配置#####
+#每个instance需要唯一的slaveId，1.0.26+版本会自动生成
+# canal.instance.mysql.slaveId=0
+
+#####GTID配置#####
+#是否启用GTID，MySQL5.6.5+支持，GTID模式下可以更方便地进行主从切换和位置管理
+canal.instance.gtidon=false
+
+#####RDS OSS Binlog配置#####
+canal.instance.rds.accesskey=
+canal.instance.rds.secretkey=
+canal.instance.rds.instanceId=
+
+#####主库位置信息（核心配置）#####
+#主库地址
+canal.instance.master.address=127.0.0.1:3306
+#binlog文件名
+canal.instance.master.journal.name=
+#binlog位置
+canal.instance.master.position=
+#时间戳定位，按时间戳定位起始位置
+canal.instance.master.timestamp=
+#GTID模式下使用，定位策略优先级：GTID > journal.name + position > timestamp > 默认最新
+canal.instance.master.gtid=
+
+#####PolarDB-X多流配置#####
+#是否启用PolarDB-X的多流并发解析，PolarDB-X支持按分区并发输出binlog，开启后可提升解析性能
+canal.instance.multi.stream.on=false
+
+#####SSL连接配置#####
+#canal.instance.master.sslMode=DISABLED
+#canal.instance.master.tlsVersions=
+#canal.instance.master.trustCertificateKeyStoreType=
+#canal.instance.master.trustCertificateKeyStoreUrl=
+#canal.instance.master.trustCertificateKeyStorePassword=
+#canal.instance.master.clientCertificateKeyStoreType=
+#canal.instance.master.clientCertificateKeyStoreUrl=
+#canal.instance.master.clientCertificateKeyStorePassword=
+#作用：配置与MySQL之间的SSL/TLS加密连接
+#适用场景：生产环境要求加密传输时
+
+#####表结构TSDB配置#####
+canal.instance.tsdb.enable=true
+#canal.instance.tsdb.url=jdbc:mysql://127.0.0.1:3306/canal_tsdb
+#canal.instance.tsdb.dbUsername=canal
+#canal.instance.tsdb.dbPassword=canal
+#作用：表结构时间序列数据库配置
+#说明：用于缓存表结构变更历史，解决DDL同步问题
+#存储位置：默认在内存，可配置为持久化到数据库
+
+#####备库配置（HA）#####
+#canal.instance.standby.address =
+#canal.instance.standby.journal.name =
+#canal.instance.standby.position =
+#canal.instance.standby.timestamp =
+#canal.instance.standby.gtid=
+#作用：配置MySQL备库信息
+#适用场景：主库故障时自动切换到备库
+
+#####数据库认证配置####
+canal.instance.dbUsername=canal
+canal.instance.dbPassword=canal
+canal.instance.connectionCharset = UTF-8
+#启用Druid密码解密
+canal.instance.enableDruid=false
+#Druid公钥，用于解密密码
+#canal.instance.pwdPublicKey=MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALK4BUxdDltRRE5/zXpVEVPUgunvscYFtEip3pmLlhrWpacX7y7GCMo2/JM6LeHmiiNdH1FWgGCpUfircSwlWKUCAwEAAQ==
+
+#####表过滤配置（重要）#####
+#白名单：只同步匹配的表
+canal.instance.filter.regex=.*\\..*
+#黑名单：排除匹配的表
+canal.instance.filter.black.regex=mysql\\.slave_.*
+#只同步指定字段
+#canal.instance.filter.field=test1.t_product:id/subject/keywords,test2.t_company:id/name/contact/ch
+#排除指定字段
+#canal.instance.filter.black.field=test1.t_product:subject/product_image,test2.t_company:id/name/contact/ch
+
+#####MQ配置#####
+#MQ主题名称
+canal.mq.topic=example
+#动态主题路由规则
+#canal.mq.dynamicTopic=mytest1.user,topic2:mytest2\\..*,.*\\..*
+#固定分区号
+canal.mq.partition=0
+# hash partition config
+#canal.mq.enableDynamicQueuePartition=false
+#分区数量
+#canal.mq.partitionsNum=3
+#canal.mq.dynamicTopicPartitionNum=test.*:4,mycanal:6
+#分区哈希规则，按字段hash分区
+#canal.mq.partitionHash=test.table:id^name,.*\\..*
+#################################################

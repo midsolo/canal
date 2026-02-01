@@ -21,33 +21,38 @@ import com.alibaba.otter.canal.common.zookeeper.ZkClientx;
 import com.alibaba.otter.canal.common.zookeeper.ZookeeperPathUtils;
 
 /**
- * 针对server的running节点控制
- * 
- * @author jianghang 2012-11-22 下午02:59:42
- * @version 1.0.0
+ * HA机制，针对server的running节点控制。
+ *   有ZooKeeper:
+ *      - 创建临时节点/otter/canal/cluster/{ip:port}
+ *      - 抢占成功的机器成为Active
+ *      - Active机器启动CanalInstance
+ *      - 其他机器成为Standby
+ *
+ *   无ZooKeeper:
+ *       - 直接启动CanalInstance
  */
 public class ServerRunningMonitor extends AbstractCanalLifeCycle {
+    private static final Logger logger = LoggerFactory.getLogger(ServerRunningMonitor.class);
 
-    private static final Logger        logger       = LoggerFactory.getLogger(ServerRunningMonitor.class);
-    private ZkClientx                  zkClient;
-    private String                     destination;
-    private IZkDataListener            dataListener;
-    private BooleanMutex               mutex        = new BooleanMutex(false);
-    private volatile boolean           release      = false;
+    private ZkClientx zkClient;
+    private String destination;
+    private IZkDataListener dataListener;
+    private BooleanMutex mutex = new BooleanMutex(false);
+    private volatile boolean release = false;
     // 当前服务节点状态信息
-    private ServerRunningData          serverData;
+    private ServerRunningData serverData;
     // 当前实际运行的节点状态信息
     private volatile ServerRunningData activeData;
-    private ScheduledExecutorService   delayExecutor;
-    private int                        delayTime    = 5;
-    private ServerRunningListener      listener;
+    private ScheduledExecutorService delayExecutor;
+    private int delayTime = 5;
+    private ServerRunningListener listener;
 
-    public ServerRunningMonitor(ServerRunningData serverData){
+    public ServerRunningMonitor(ServerRunningData serverData) {
         this();
         this.serverData = serverData;
     }
 
-    public ServerRunningMonitor(){
+    public ServerRunningMonitor() {
         // 创建父节点
         dataListener = new IZkDataListener() {
 
@@ -165,7 +170,7 @@ public class ServerRunningMonitor extends AbstractCanalLifeCycle {
 
     /**
      * 阻塞等待自己成为active，如果自己成为active，立马返回
-     * 
+     *
      * @throws InterruptedException
      */
     public void waitForActive() throws InterruptedException {
@@ -186,8 +191,8 @@ public class ServerRunningMonitor extends AbstractCanalLifeCycle {
             boolean result = isMine(activeData.getAddress());
             if (!result) {
                 logger.warn("canal is running in node[{}] , but not in node[{}]",
-                    activeData.getAddress(),
-                    serverData.getAddress());
+                        activeData.getAddress(),
+                        serverData.getAddress());
             }
             return result;
         } catch (ZkNoNodeException e) {

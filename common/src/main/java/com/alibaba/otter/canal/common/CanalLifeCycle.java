@@ -1,14 +1,12 @@
 package com.alibaba.otter.canal.common;
 
 /**
- * @author jianghang 2012-7-12 上午09:39:33
- * @version 1.0.0
+ * Canal生命周期
  */
 public interface CanalLifeCycle {
 
     void start();
-
     void stop();
-
     boolean isStart();
+
 }

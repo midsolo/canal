@@ -11,9 +11,7 @@ import com.googlecode.aviator.runtime.type.AviatorBoolean;
 import com.googlecode.aviator.runtime.type.AviatorObject;
 
 /**
- * 提供aviator regex的代码扩展
- *
- * @author jianghang 2012-7-23 上午10:29:23
+ * 对Aviator自定义的函数的扩展，内部使用到了oro中的Perl5Matcher来进行正则匹配
  */
 public class RegexFunction extends AbstractFunction {
 

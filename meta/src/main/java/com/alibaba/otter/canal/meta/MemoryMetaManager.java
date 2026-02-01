@@ -14,10 +14,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.MigrateMap;
 
 /**
- * 内存版实现
- * 
- * @author zebin.xuzb @ 2012-7-2
- * @version 1.0.0
+ * 将元数据存储到内存中
  */
 public class MemoryMetaManager extends AbstractCanalLifeCycle implements CanalMetaManager {
 

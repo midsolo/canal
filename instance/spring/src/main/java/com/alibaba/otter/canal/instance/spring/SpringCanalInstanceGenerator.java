@@ -13,25 +13,30 @@ import com.alibaba.otter.canal.instance.core.CanalInstanceGenerator;
 import com.alibaba.otter.canal.parse.CanalEventParser;
 
 /**
- * @author zebin.xuzb @ 2012-7-12
- * @version 1.0.0
+ * 提供了基于Spring配置方式的CanalInstanceWithSpring实现，即CanalInstance实例的创建，通过Spring配置文件来创建。
  */
 public class SpringCanalInstanceGenerator implements CanalInstanceGenerator {
+    private static final Logger logger = LoggerFactory.getLogger(SpringCanalInstanceGenerator.class);
 
-    private static final Logger logger      = LoggerFactory.getLogger(SpringCanalInstanceGenerator.class);
     private String              springXml;
     private String              defaultName = "instance";
     private BeanFactory         beanFactory;
 
+    @Override // CanalInstance生成流程
     public CanalInstance generate(String destination) {
         synchronized (CanalEventParser.class) {
             try {
-                // 设置当前正在加载的通道，加载spring查找文件时会用到该变量
+                // ========1. 设置当前destination到系统属性========
+                // Spring配置文件中会使用${canal.instance.destination}占位符
                 System.setProperty("canal.instance.destination", destination);
+
+                // ========2. 加载Spring配置文件========
                 this.beanFactory = getBeanFactory(springXml);
+
+                // ========3. 获取Bean========
                 String beanName = destination;
                 if (!beanFactory.containsBean(beanName)) {
-                    beanName = defaultName;
+                    beanName = defaultName; // 使用默认的"instance"bean
                 }
 
                 return (CanalInstance) beanFactory.getBean(beanName);
@@ -39,6 +44,7 @@ public class SpringCanalInstanceGenerator implements CanalInstanceGenerator {
                 logger.error("generator instance failed.", e);
                 throw new CanalException(e);
             } finally {
+                // ========4. 清理系统属性========
                 System.setProperty("canal.instance.destination", "");
             }
         }
@@ -55,4 +61,5 @@ public class SpringCanalInstanceGenerator implements CanalInstanceGenerator {
     public void setSpringXml(String springXml) {
         this.springXml = springXml;
     }
+
 }

@@ -15,33 +15,37 @@ import com.alibaba.otter.canal.parse.inbound.mysql.MysqlEventParser;
  * <pre>
  * 注意点：aliyun的binlog会有定期清理并备份到oss上, 这里实现了一份自动下载oss+rds binlog的机制
  * </pre>
- *
- * @author chengjin.lyf on 2018/7/20 上午10:52
- * @since 1.0.25
  */
 public class RdsBinlogEventParserProxy extends MysqlEventParser {
 
-    private String                    rdsOpenApiUrl             = "https://rds.aliyuncs.com/"; // openapi地址
-    private String                    accesskey;                                              // 云账号的ak
-    private String                    secretkey;                                              // 云账号sk
-    private String                    instanceId;                                             // rds实例id
-    private String                    directory;                                              // binlog目录
-    private int                       batchFileSize             = 4;                          // 最多下载的binlog文件数量
+    private String rdsOpenApiUrl = "https://rds.aliyuncs.com/"; // openapi地址
+    private String accesskey;                                   // 云账号的ak
+    private String secretkey;                                   // 云账号sk
+    private String instanceId;                                  // rds实例id
+    private String directory;                                   // binlog目录
+    private int batchFileSize = 4;                              // 最多下载的binlog文件数量
 
     private RdsLocalBinlogEventParser rdsLocalBinlogEventParser = null;
-    private ExecutorService           executorService           = Executors.newSingleThreadExecutor(r -> {
-                                                                        Thread t = new Thread(r,
-                                                                            "rds-binlog-daemon-thread");
-                                                                        t.setDaemon(true);
-                                                                        return t;
-                                                                    });
+    private ExecutorService executorService = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "rds-binlog-daemon-thread");
+        t.setDaemon(true);
+        return t;
+    });
 
     @Override
     public void start() {
-        if (rdsLocalBinlogEventParser == null && StringUtils.isNotEmpty(accesskey) && StringUtils.isNotEmpty(secretkey)
-            && StringUtils.isNotEmpty(instanceId)) {
+        /*
+        在启动的时候，会检查instance.properties中是否配置了rds oss binlog，
+        如果配置了：
+        ##### rds oss binlog #####
+        canal.instance.rds.accesskey=
+        canal.instance.rds.secretkey=
+        canal.instance.rds.instanceId=
+        则启动rds oss binlog parser，否则调用父类MysqlEventParser#start。
+         */
+        if (rdsLocalBinlogEventParser == null && StringUtils.isNotEmpty(accesskey)
+                && StringUtils.isNotEmpty(secretkey) && StringUtils.isNotEmpty(instanceId)) {
             rdsLocalBinlogEventParser = new RdsLocalBinlogEventParser();
-            // rds oss mode
             setRdsOssMode(true);
             final ParserExceptionHandler targetHandler = this.getParserExceptionHandler();
             if (directory == null) {
@@ -58,7 +62,6 @@ public class RdsBinlogEventParserProxy extends MysqlEventParser {
             rdsLocalBinlogEventParser.setFilterQueryDml(this.filterQueryDml);
             rdsLocalBinlogEventParser.setFilterRows(this.filterRows);
             rdsLocalBinlogEventParser.setFilterTableError(this.filterTableError);
-            // rdsLocalBinlogEventParser.setIsGTIDMode(this.isGTIDMode);
             rdsLocalBinlogEventParser.setMasterInfo(this.masterInfo);
             rdsLocalBinlogEventParser.setEventFilter(this.eventFilter);
             rdsLocalBinlogEventParser.setMasterPosition(this.masterPosition);
@@ -75,8 +78,6 @@ public class RdsBinlogEventParserProxy extends MysqlEventParser {
             rdsLocalBinlogEventParser.setParallelThreadSize(this.parallelThreadSize);
             rdsLocalBinlogEventParser.setFinishListener(() -> executorService.execute(() -> {
                 rdsLocalBinlogEventParser.stop();
-                // empty the dump error count,or will go into local binlog mode again,with error
-                // position,never get out,fixed by bucketli
                 RdsBinlogEventParserProxy.this.setDumpErrorCount(0);
                 RdsBinlogEventParserProxy.this.start();
             }));
@@ -88,6 +89,7 @@ public class RdsBinlogEventParserProxy extends MysqlEventParser {
             });
         }
 
+        // 不使用aliyun rds，则使用父类MysqlEventParser#start
         super.start();
     }
 

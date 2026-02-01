@@ -15,15 +15,15 @@ import com.googlecode.aviator.AviatorEvaluator;
 import com.googlecode.aviator.Expression;
 
 /**
- * 基于aviater进行tableName正则匹配的过滤算法
- * 
- * @author jianghang 2012-7-20 下午06:01:34
+ * 基于Aviator进行tableName正则匹配的过滤算法，在源码中只使用到了这个匹配算法，
+ * 可参考: default-instance.properties中的配置。
  */
 public class AviaterRegexFilter implements CanalEventFilter<String> {
 
     private static final String             SPLIT             = ",";
     private static final String             PATTERN_SPLIT     = "|";
     private static final String             FILTER_EXPRESSION = "regex(pattern,target)";
+    // 对Aviator自定义的函数的扩展，内部使用到了oro中的Perl5Matcher来进行正则匹配
     private static final RegexFunction      regexFunction     = new RegexFunction();
     private final Expression                exp               = AviatorEvaluator.compile(FILTER_EXPRESSION, true);
     static {

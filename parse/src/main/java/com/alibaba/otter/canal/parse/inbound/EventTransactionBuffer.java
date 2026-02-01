@@ -13,36 +13,36 @@ import com.alibaba.otter.canal.store.CanalStoreException;
 
 /**
  * 缓冲event队列，提供按事务刷新数据的机制
- * 
+ *
  * @author jianghang 2012-12-6 上午11:05:12
  * @version 1.0.0
  */
 public class EventTransactionBuffer extends AbstractCanalLifeCycle {
 
-    private static final long        INIT_SQEUENCE = -1;
-    private int                      bufferSize    = 1024;
-    private int                      indexMask;
-    private CanalEntry.Entry[]       entries;
+    private static final long INIT_SQEUENCE = -1;
+    private int bufferSize = 1024;
+    private int indexMask;
+    private CanalEntry.Entry[] entries;
 
-    private AtomicLong               putSequence   = new AtomicLong(INIT_SQEUENCE); // 代表当前put操作最后一次写操作发生的位置
-    private AtomicLong               flushSequence = new AtomicLong(INIT_SQEUENCE); // 代表满足flush条件后最后一次数据flush的时间
+    private AtomicLong putSequence = new AtomicLong(INIT_SQEUENCE);   // 代表当前put操作最后一次写操作发生的位置
+    private AtomicLong flushSequence = new AtomicLong(INIT_SQEUENCE); // 代表满足flush条件后最后一次数据flush的时间
 
     private TransactionFlushCallback flushCallback;
 
-    public EventTransactionBuffer(){
+    public EventTransactionBuffer() {
 
     }
 
-    public EventTransactionBuffer(TransactionFlushCallback flushCallback){
+    public EventTransactionBuffer(TransactionFlushCallback flushCallback) {
         this.flushCallback = flushCallback;
     }
 
+    @Override
     public void start() throws CanalStoreException {
         super.start();
         if (Integer.bitCount(bufferSize) != 1) {
             throw new IllegalArgumentException("bufferSize must be a power of 2");
         }
-
         Assert.notNull(flushCallback, "flush callback is null!");
         indexMask = bufferSize - 1;
         entries = new CanalEntry.Entry[bufferSize];
@@ -51,7 +51,6 @@ public class EventTransactionBuffer extends AbstractCanalLifeCycle {
     public void stop() throws CanalStoreException {
         putSequence.set(INIT_SQEUENCE);
         flushSequence.set(INIT_SQEUENCE);
-
         entries = null;
         super.stop();
     }
@@ -62,26 +61,40 @@ public class EventTransactionBuffer extends AbstractCanalLifeCycle {
         }
     }
 
+    /**
+     * 事务边界触发flush的时机:
+     * ┌──────────────────┬────────────────────────────┐
+     * │    EntryType     │           触发时机          │
+     * ├──────────────────┼─────────────────────────────┤
+     * │ TRANSACTIONBEGIN │ flush上一个事务后，放入BEGIN │
+     * ├──────────────────┼─────────────────────────────┤
+     * │ TRANSACTIONEND   │ 放入END后立即flush          │
+     * ├──────────────────┼─────────────────────────────┤
+     * │ ROWDATA(非DML)   │ 立即flush                   │
+     * ├──────────────────┼─────────────────────────────┤
+     * │ HEARTBEAT        │ 立即flush                   │
+     * ├──────────────────┼─────────────────────────────┤
+     * │ ROWDATA(DML)     │ 放入buffer，等待事务结束flush │
+     * └──────────────────┴─────────────────────────────┘
+     */
     public void add(CanalEntry.Entry entry) throws InterruptedException {
         switch (entry.getEntryType()) {
-            case TRANSACTIONBEGIN:
-                flush();// 刷新上一次的数据
-                put(entry);
+            case TRANSACTIONBEGIN: // ──▶ flush() + put(entry)
+                flush();           // 先刷新上一个事务
+                put(entry);        // 再放入新事务开始标记BEGIN
                 break;
-            case TRANSACTIONEND:
-                put(entry);
-                flush();
+            case TRANSACTIONEND:   // ──▶ put(entry) + flush()
+                put(entry);        // 放入事务结束标记END
+                flush();           // 事务结束，刷新整个事务
                 break;
-            case ROWDATA:
-                put(entry);
-                // 针对非DML的数据，直接输出，不进行buffer控制
+            case ROWDATA:          // ──▶ put(entry) + flush()
+                put(entry);        // 放入行数据
                 EventType eventType = entry.getHeader().getEventType();
                 if (eventType != null && !isDml(eventType)) {
-                    flush();
+                    flush();       // 非DML的数据，直接刷新
                 }
                 break;
-            case HEARTBEAT:
-                // master过来的heartbeat，说明binlog已经读完了，是idle状态
+            case HEARTBEAT:        // ──▶ put(entry) + flush()
                 put(entry);
                 flush();
                 break;
@@ -105,7 +118,7 @@ public class EventTransactionBuffer extends AbstractCanalLifeCycle {
             entries[getIndex(next)] = data;
             putSequence.set(next);
         } else {
-            flush();// buffer区满了，刷新一下
+            flush();  // buffer区满了，刷新一下
             put(data);// 继续加一下新数据
         }
     }
@@ -120,8 +133,10 @@ public class EventTransactionBuffer extends AbstractCanalLifeCycle {
                 transaction.add(this.entries[getIndex(next)]);
             }
 
+            // =====调用flushCallback，定义在AbstractEventParser构造器中=====
             flushCallback.flush(transaction);
-            flushSequence.set(end);// flush成功后，更新flush位置
+            // flush成功后，更新flush位置
+            flushSequence.set(end);
         }
     }
 
@@ -157,13 +172,10 @@ public class EventTransactionBuffer extends AbstractCanalLifeCycle {
 
     /**
      * 事务刷新机制
-     * 
-     * @author jianghang 2012-12-6 上午11:57:38
-     * @version 1.0.0
      */
-    public static interface TransactionFlushCallback {
+    public interface TransactionFlushCallback {
 
-        public void flush(List<CanalEntry.Entry> transaction) throws InterruptedException;
+        void flush(List<CanalEntry.Entry> transaction) throws InterruptedException;
     }
 
 }

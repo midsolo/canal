@@ -140,76 +140,23 @@ public final class CanalPacket {
   }
 
   /**
-   * Protobuf enum {@code com.alibaba.otter.canal.protocol.PacketType}
+   * 消息类型枚举
    */
-  public enum PacketType
-      implements com.google.protobuf.ProtocolMessageEnum {
-    /**
-     * <pre>
-     *compatible
-     * </pre>
-     *
-     * <code>PACKAGETYPECOMPATIBLEPROTO2 = 0;</code>
-     */
+  public enum PacketType implements com.google.protobuf.ProtocolMessageEnum {
     PACKAGETYPECOMPATIBLEPROTO2(0),
-    /**
-     * <code>HANDSHAKE = 1;</code>
-     */
-    HANDSHAKE(1),
-    /**
-     * <code>CLIENTAUTHENTICATION = 2;</code>
-     */
-    CLIENTAUTHENTICATION(2),
-    /**
-     * <code>ACK = 3;</code>
-     */
-    ACK(3),
-    /**
-     * <code>SUBSCRIPTION = 4;</code>
-     */
-    SUBSCRIPTION(4),
-    /**
-     * <code>UNSUBSCRIPTION = 5;</code>
-     */
-    UNSUBSCRIPTION(5),
-    /**
-     * <code>GET = 6;</code>
-     */
-    GET(6),
-    /**
-     * <code>MESSAGES = 7;</code>
-     */
-    MESSAGES(7),
-    /**
-     * <code>CLIENTACK = 8;</code>
-     */
-    CLIENTACK(8),
-    /**
-     * <pre>
-     * management part
-     * </pre>
-     *
-     * <code>SHUTDOWN = 9;</code>
-     */
+    HANDSHAKE(1),            // S→C  握手，发送认证种子
+    CLIENTAUTHENTICATION(2), // C→S  客户端端认证
+    ACK(3),                  // 双向  确认/错误响应
+    SUBSCRIPTION(4),         // C→S  订阅请求
+    UNSUBSCRIPTION(5),       // C→S  取消订阅
+    GET(6),                  // C→S  获取消息
+    MESSAGES(7),             // S→C  消息响应
+    CLIENTACK(8),            // C→S  客户端确认
     SHUTDOWN(9),
-    /**
-     * <pre>
-     * integration
-     * </pre>
-     *
-     * <code>DUMP = 10;</code>
-     */
     DUMP(10),
-    /**
-     * <code>HEARTBEAT = 11;</code>
-     */
     HEARTBEAT(11),
-    /**
-     * <code>CLIENTROLLBACK = 12;</code>
-     */
-    CLIENTROLLBACK(12),
-    UNRECOGNIZED(-1),
-    ;
+    CLIENTROLLBACK(12),      // C→S  客户端回滚
+    UNRECOGNIZED(-1);
 
     /**
      * <pre>

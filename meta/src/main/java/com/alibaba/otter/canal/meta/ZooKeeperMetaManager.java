@@ -25,7 +25,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 /**
- * zk 版本的 canal manager， 存储结构：
+ * ==将元数据存存储到zk中==
+ * zk版本的canal manager，存储结构：
  *
  * <pre>
  * /otter
@@ -39,10 +40,6 @@ import com.google.common.collect.Maps;
  *              2
  *              3
  * </pre>
- *
- * @author zebin.xuzb @ 2012-6-21
- * @author jianghang
- * @version 1.0.0
  */
 public class ZooKeeperMetaManager extends AbstractCanalLifeCycle implements CanalMetaManager {
 

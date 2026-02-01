@@ -46,6 +46,7 @@ public class CanalEventUtils {
      * 根据entry创建对应的Position对象
      */
     public static LogPosition createPosition(Event event) {
+        // =====创建一个EntryPosition实例，提取event中的位置信息=====
         EntryPosition position = new EntryPosition();
         position.setJournalName(event.getJournalName());
         position.setPosition(event.getPosition());
@@ -55,6 +56,7 @@ public class CanalEventUtils {
         // add gtid
         position.setGtid(event.getGtid());
 
+        // LogIdentity中包含了这个event来源的mysql实力的ip地址信息
         LogPosition logPosition = new LogPosition();
         logPosition.setPostion(position);
         logPosition.setIdentity(event.getLogIdentity());
@@ -86,8 +88,10 @@ public class CanalEventUtils {
      */
     public static boolean checkPosition(Event event, LogPosition logPosition) {
         EntryPosition position = logPosition.getPostion();
+        // 首先比较Event的生成时间
         boolean result = position.getTimestamp().equals(event.getExecuteTime());
 
+        // 如果位置信息的binlog文件名或者信息不为空的话(通常不为空)，则会进行精确匹配
         boolean exactely = (StringUtils.isBlank(position.getJournalName()) && position.getPosition() == null);
         if (!exactely) {// 精确匹配
             result &= position.getPosition().equals(event.getPosition());

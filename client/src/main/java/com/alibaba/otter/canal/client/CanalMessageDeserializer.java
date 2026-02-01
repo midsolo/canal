@@ -54,4 +54,5 @@ public class CanalMessageDeserializer {
             throw new CanalClientException("deserializer failed by " + e.getMessage(), e);
         }
     }
+
 }

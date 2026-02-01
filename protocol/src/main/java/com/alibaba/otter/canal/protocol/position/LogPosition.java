@@ -1,16 +1,13 @@
 package com.alibaba.otter.canal.protocol.position;
 
 /**
- * 基于mysql/oracle log位置标示
- * 
- * @author jianghang 2012-6-21 上午10:52:41
- * @version 1.0.0
+ * 完整的位置信息
  */
 public class LogPosition extends Position {
-
     private static final long serialVersionUID = 3875012010277005819L;
-    private LogIdentity       identity;
-    private EntryPosition     postion;
+
+    private LogIdentity       identity; // 数据来源标识（地址、slaveId）
+    private EntryPosition     postion;  // 具体的binlog位置
 
     public LogIdentity getIdentity() {
         return identity;

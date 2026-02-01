@@ -10,7 +10,25 @@
            http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-2.5.xsd"
 	default-autowire="byName">
 
-	<!-- properties -->
+    <!--
+     PropertyPlaceholderConfigurer-配置加载详解
+
+     // base-instance.xml
+    <bean class="com.alibaba.otter.canal.instance.spring.support.PropertyPlaceholderConfigurer">
+      <property name="ignoreResourceNotFound" value="true" />
+      <property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE"/>
+      <property name="locationNames">
+          <list>
+              全局配置
+              <value>classpath:canal.properties</value>
+
+              实例配置：${canal.instance.destination} 会被替换为 "example"
+              <value>classpath:${canal.instance.destination:}/instance.properties</value>
+              实际加载：classpath:example/instance.properties
+          </list>
+      </property>
+    </bean>
+     -->
 	<bean class="com.alibaba.otter.canal.instance.spring.support.PropertyPlaceholderConfigurer" lazy-init="false">
 		<property name="ignoreResourceNotFound" value="true" />
 		<property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE"/><!-- 允许system覆盖 -->
@@ -30,7 +48,7 @@
 			</list>
 		</property>
 	</bean>
-	
+
 	<bean id="baseEventParser" class="com.alibaba.otter.canal.parse.inbound.mysql.rds.RdsBinlogEventParserProxy" abstract="true">
 		<property name="accesskey" value="${canal.aliyun.accesskey:}" />
 		<property name="secretkey" value="${canal.aliyun.secretkey:}" />

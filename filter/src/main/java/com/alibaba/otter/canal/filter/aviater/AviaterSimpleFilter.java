@@ -14,9 +14,7 @@ import com.googlecode.aviator.AviatorEvaluator;
 import com.googlecode.aviator.Expression;
 
 /**
- * 基于aviater进行tableName简单过滤计算，不支持正则匹配
- * 
- * @author jianghang 2012-7-20 下午05:53:30
+ * 基于Aviator进行tableName简单过滤计算，不支持正则匹配
  */
 public class AviaterSimpleFilter implements CanalEventFilter<String> {
 

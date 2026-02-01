@@ -1,0 +1,274 @@
+#################################################
+######### 		common argument		#############
+#################################################
+#canal绑定的IP地址
+canal.ip =
+#canal注册到zk的IP，多网卡环境下需指定对外暴露的IP
+canal.register.ip =
+#canal监听的端口，客户端通过该端口连接
+canal.port = 11111
+#prometheus指标拉取的端口号
+canal.metrics.pull.port = 11112
+#客户端连接用户名（1.1.5+支持）
+# canal.user = canal
+#客户端连接密码（需要加密）
+# canal.passwd =
+
+#####Admin管理配置#####
+#Admin管理端地址，如127.0.0.1:8089
+#canal.admin.manager = 127.0.0.1:8089
+#canal向Admin注册的端口
+canal.admin.port = 11110
+#Admin认证用户名
+canal.admin.user = admin
+#Admin认证密码
+canal.admin.passwd =
+#是否自动注册到Admin
+#canal.admin.register.auto = true
+#集群名称
+#canal.admin.register.cluster =
+#实例注册名称
+#canal.admin.register.name =
+
+#####zk配置#####
+#zk集群地址，如127.0.0.1:2181,127.0.0.1:2182
+canal.zkServers =
+#数据刷入zk的间隔（毫秒）
+canal.zookeeper.flush.period = 1000
+#是否禁用Netty（调试用）
+canal.withoutNetty = false
+
+#####运行模式配置#####
+#消息投递模式，默认tcp，支持kafka, rocketMQ, rabbitMQ, pulsarMQ
+canal.serverMode = tcp
+
+#####存储配置#####
+#数据存储目录
+canal.file.data.dir = ${canal.conf.dir}
+#刷盘间隔（毫秒）
+canal.file.flush.period = 1000
+
+#####内存存储（重要）#####
+#RingBuffer大小，必须是2的幂次方，默认16MB
+canal.instance.memory.buffer.size = 16384
+#每个Entry占用的内存单位（字节）
+canal.instance.memory.buffer.memunit = 1024
+#获取模式：MEMSIZE按内存/ITEMSIZE按条数
+canal.instance.memory.batch.mode = MEMSIZE
+#是否使用原始Entry（减少内存拷贝）
+canal.instance.memory.rawEntry = true
+##调优建议
+# ┌──────────────────┬─────────────┬────────────┐
+# │       场景       │ buffer.size │ batch.mode │
+# ├──────────────────┼─────────────┼────────────┤
+# │ 低延迟（小事务）  │ 8192        │ MEMSIZE    │
+# ├──────────────────┼─────────────┼────────────┤
+# │ 高吞吐（大事务）  │ 32768       │ ITEMSIZE   │
+# ├──────────────────┼─────────────┼────────────┤
+# │ 内存受限          │ 4096        │ MEMSIZE    │
+# └──────────────────┴─────────────┴────────────┘
+##公式：总内存 ≈ buffer.size × memunit × 实例数
+
+
+#####检测机制配置（HA 核心）#####
+#是否开启MySQL连接检测
+canal.instance.detecting.enable = false
+#检测SQL（用于检测主库存活）
+canal.instance.detecting.sql = select 1
+#检测间隔（秒）
+canal.instance.detecting.interval.time = 3
+#检测失败重试阈值
+canal.instance.detecting.retry.threshold = 3
+#是否启用心跳HA
+canal.instance.detecting.heartbeatHaEnable = false
+
+#####事务与网络配置#####
+#最大事务大小，超过则拆分
+canal.instance.transaction.size =  1024
+#主从切换后的回退时间
+canal.instance.fallbackIntervalInSeconds = 60
+#TCP接收缓冲区
+canal.instance.network.receiveBufferSize = 16384
+#TCP发送缓冲区
+canal.instance.network.sendBufferSize = 16384
+#Socket超时（秒）
+canal.instance.network.soTimeout = 30
+
+#####Binlog过滤配置#####
+#是否过滤DDL语句（Druid解析）
+canal.instance.filter.druid.ddl = true
+#是否过滤DCL（GRANT/REVOKE）
+canal.instance.filter.query.dcl = false
+#是否过滤DML无表事件
+canal.instance.filter.query.dml = false
+#是否过滤DDL
+canal.instance.filter.query.ddl = false
+#是否过滤表结构错误
+canal.instance.filter.table.error = false
+#是否过滤原始数据行
+canal.instance.filter.rows = false
+#是否过滤事务头尾
+canal.instance.filter.transaction.entry = false
+#是否过滤INSERT
+canal.instance.filter.dml.insert = false
+#是否过滤UPDATE
+canal.instance.filter.dml.update = false
+#是否过滤DELETE
+canal.instance.filter.dml.delete = false
+
+#####binlog格式校验#####
+#支持的binlog格式
+canal.instance.binlog.format = ROW,STATEMENT,MIXED
+#支持的binlog镜像格式
+canal.instance.binlog.image = FULL,MINIMAL,NOBLOB
+#DDL是否隔离（单独投递）
+canal.instance.get.ddl.isolation = false
+##推荐：生产环境使用 ROW + FULL 模式##
+
+#####并行解析配置#####
+#是否开启并行解析
+canal.instance.parser.parallel = true
+#并行线程数（默认可用处理器的60%）
+#canal.instance.parser.parallelThreadSize = 16
+#解析器RingBuffer大小（必须为2的幂）
+canal.instance.parser.parallelBufferSize = 256
+##开启条件：
+# 1. MySQL binlog格式为ROW
+# 2. 实例数据量较大
+# 3. CPU资源充足
+
+#####表结构快照（TSDB）#####
+#是否启用表结构快照
+canal.instance.tsdb.enable = true
+#快照存储目录
+canal.instance.tsdb.dir = ${canal.file.data.dir:../conf}/${canal.instance.destination:}
+#H2数据库连接
+canal.instance.tsdb.url = jdbc:h2:${canal.instance.tsdb.dir}/h2;CACHE_SIZE=1000;MODE=MYSQL;
+canal.instance.tsdb.dbUsername = canal
+canal.instance.tsdb.dbPassword = canal
+#快照间隔（小时）
+canal.instance.tsdb.snapshot.interval = 24
+#快照过期时间（小时）
+canal.instance.tsdb.snapshot.expire = 360
+##作用：
+#解决DDL后表结构变更的问题：
+# 1. 记录表结构历史版本
+# 2. 根据时间戳匹配正确的表结构
+# 3. 支持旧数据按旧结构解析
+
+#################################################
+######### 		destinations		#############
+#################################################
+#####实例配置#####
+#定义的实例列表（逗号分隔）
+canal.destinations = example
+#配置文件目录
+canal.conf.dir = ../conf
+#是否自动扫描配置变更
+canal.auto.scan = true
+#扫描间隔（秒）
+canal.auto.scan.interval = 5
+#binlog位置丢失时是否跳到最新（生产环境建议false）
+#警告：canal.auto.reset.latest.pos.mode=true 会导致数据丢失
+canal.auto.reset.latest.pos.mode = false
+
+canal.instance.tsdb.spring.xml = classpath:spring/tsdb/h2-tsdb.xml
+#canal.instance.tsdb.spring.xml = classpath:spring/tsdb/mysql-tsdb.xml
+
+#####Spring模式配置#####
+#全局模式：spring/native
+canal.instance.global.mode = spring
+#是否延迟加载
+canal.instance.global.lazy = false
+canal.instance.global.manager.address = ${canal.admin.manager}
+#canal.instance.global.spring.xml = classpath:spring/memory-instance.xml
+#Spring配置文件
+canal.instance.global.spring.xml = classpath:spring/file-instance.xml
+#canal.instance.global.spring.xml = classpath:spring/default-instance.xml
+##Spring配置文件选择
+# ┌──────────────────────┬────────────┬────────────┐
+# │       配置文件        │ 元数据存储 │  适用场景  │
+# ├──────────────────────┼────────────┼────────────┤
+# │ memory-instance.xml  │ 内存       │ 测试、单机 │
+# ├──────────────────────┼────────────┼────────────┤
+# │ file-instance.xml    │ 文件       │ 生产、单机 │
+# ├──────────────────────┼────────────┼────────────┤
+# │ default-instance.xml │ Zookeeper  │ 生产、HA   │
+# └──────────────────────┴────────────┴────────────┘
+
+
+##################################################
+######### 	      MQ Properties      #############
+##################################################
+#####MQ通用配置#####
+
+# aliyun ak/sk , support rds/mq
+canal.aliyun.accessKey =
+canal.aliyun.secretKey =
+canal.aliyun.uid=
+
+#是否平铺消息格式
+canal.mq.flatMessage = true
+#批次大小
+canal.mq.canalBatchSize = 50
+#获取超时（毫秒）
+canal.mq.canalGetTimeout = 100
+#阿里云通道
+canal.mq.accessChannel = local
+
+canal.mq.database.hash = true
+canal.mq.send.thread.size = 30
+canal.mq.build.thread.size = 8
+
+##################################################
+######### 		     Kafka 		     #############
+##################################################
+kafka.bootstrap.servers = 127.0.0.1:9092
+kafka.acks = all
+kafka.compression.type = none
+kafka.batch.size = 16384
+kafka.linger.ms = 1
+kafka.max.request.size = 1048576
+kafka.buffer.memory = 33554432
+kafka.max.in.flight.requests.per.connection = 1
+kafka.retries = 0
+
+kafka.kerberos.enable = false
+kafka.kerberos.krb5.file = ../conf/kerberos/krb5.conf
+kafka.kerberos.jaas.file = ../conf/kerberos/jaas.conf
+
+# sasl demo
+# kafka.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required \\n username=\"alice\" \\npassword="alice-secret\";
+# kafka.sasl.mechanism = SCRAM-SHA-512
+# kafka.security.protocol = SASL_PLAINTEXT
+
+##################################################
+######### 		    RocketMQ	     #############
+##################################################
+rocketmq.producer.group = test
+rocketmq.enable.message.trace = false
+rocketmq.customized.trace.topic =
+rocketmq.namespace =
+rocketmq.namesrv.addr = 127.0.0.1:9876
+rocketmq.retry.times.when.send.failed = 0
+rocketmq.vip.channel.enabled = false
+rocketmq.tag =
+
+##################################################
+######### 		    RabbitMQ	     #############
+##################################################
+rabbitmq.host =
+rabbitmq.virtual.host =
+rabbitmq.exchange =
+rabbitmq.username =
+rabbitmq.password =
+rabbitmq.queue =
+rabbitmq.routingKey =
+rabbitmq.deliveryMode =
+
+##################################################
+######### 		      Pulsar         #############
+##################################################
+pulsarmq.serverUrl =
+pulsarmq.roleToken =
+pulsarmq.topicTenantPrefix =

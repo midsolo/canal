@@ -25,43 +25,42 @@ import com.alibaba.otter.canal.common.zookeeper.ZookeeperPathUtils;
 import com.alibaba.otter.canal.protocol.exception.CanalClientException;
 
 /**
- * clinet running控制
- * 
- * @author jianghang 2012-11-22 下午03:43:01
- * @version 1.0.0
+ * 客户端运行监控器
  */
 public class ClientRunningMonitor extends AbstractCanalLifeCycle {
+    private static final Logger logger = LoggerFactory.getLogger(ClientRunningMonitor.class);
 
-    private static final Logger        logger       = LoggerFactory.getLogger(ClientRunningMonitor.class);
-    private ZkClientx                  zkClient;
-    private String                     destination;
-    private ClientRunningData          clientData;
-    private IZkDataListener            dataListener;
-    private BooleanMutex               mutex        = new BooleanMutex(false);
-    private volatile boolean           release      = false;
+    private ZkClientx zkClient;
+    private String destination;
+    private ClientRunningData clientData;
+    private IZkDataListener dataListener;
+    private BooleanMutex mutex = new BooleanMutex(false);
+    private volatile boolean release = false;
     private volatile ClientRunningData activeData;
-    private ScheduledExecutorService   delayExector = Executors.newScheduledThreadPool(1);
-    private ClientRunningListener      listener;
-    private int                        delayTime    = 5;
+    private ScheduledExecutorService delayExector = Executors.newScheduledThreadPool(1);
+    private ClientRunningListener listener;
+    private int delayTime = 5;
 
-    public ClientRunningMonitor(){
+    public ClientRunningMonitor() {
         dataListener = new IZkDataListener() {
-
+            @Override // ==检测是否有其他客户端抢占==
             public void handleDataChange(String dataPath, Object data) throws Exception {
                 MDC.put("destination", destination);
                 ClientRunningData runningData = JsonUtils.unmarshalFromByte((byte[]) data, ClientRunningData.class);
                 if (!isMine(runningData.getAddress())) {
+                    // 暂停当前客户端
                     mutex.set(false);
                 }
-
-                if (!runningData.isActive() && isMine(runningData.getAddress())) { // 说明出现了主动释放的操作，并且本机之前是active
+                // 说明出现了主动释放的操作，并且本机之前是active
+                if (!runningData.isActive() && isMine(runningData.getAddress())) {
                     release = true;
-                    releaseRunning();// 彻底释放mainstem
+                    // 彻底释放mainstem
+                    releaseRunning();
                 }
-
                 activeData = (ClientRunningData) runningData;
             }
 
+            @Override // ==检测Active客户端退出==
             public void handleDataDeleted(String dataPath) throws Exception {
                 MDC.put("destination", destination);
                 mutex.set(false);
@@ -75,22 +74,20 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
                     delayExector.schedule(() -> initRunning(), delayTime, TimeUnit.SECONDS);
                 }
             }
-
         };
-
     }
 
+    @Override
     public void start() {
         super.start();
-
         String path = ZookeeperPathUtils.getDestinationClientRunning(this.destination, clientData.getClientId());
         zkClient.subscribeDataChanges(path, dataListener);
         initRunning();
     }
 
+    @Override
     public void stop() {
         super.stop();
-
         String path = ZookeeperPathUtils.getDestinationClientRunning(this.destination, clientData.getClientId());
         zkClient.unsubscribeDataChanges(path, dataListener);
         releaseRunning(); // 尝试一下release
@@ -110,17 +107,21 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
         }
 
         String path = ZookeeperPathUtils.getDestinationClientRunning(this.destination, clientData.getClientId());
-        // 序列化
         byte[] bytes = JsonUtils.marshalToByte(clientData);
+
         try {
             mutex.set(false);
+
+            // 尝试在ZK创建EPHEMERAL节点，成功 → 成为Active；失败 → 成为Standby，等待下次机会
             zkClient.create(path, bytes, CreateMode.EPHEMERAL);
             processActiveEnter();// 触发一下事件
             activeData = clientData;
-            mutex.set(true);
+
+            mutex.set(true);  // 允许业务运行
         } catch (ZkNodeExistsException e) {
             bytes = zkClient.readData(path, true);
-            if (bytes == null) {// 如果不存在节点，立即尝试一次
+            // 如果不存在节点，立即尝试一次
+            if (bytes == null) {
                 initRunning();
             } else {
                 activeData = JsonUtils.unmarshalFromByte(bytes, ClientRunningData.class);
@@ -130,14 +131,11 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
                 }
             }
         } catch (ZkNoNodeException e) {
-            zkClient.createPersistent(ZookeeperPathUtils.getClientIdNodePath(this.destination, clientData.getClientId()),
-                true); // 尝试创建父节点
+            // 尝试创建父节点
+            zkClient.createPersistent(ZookeeperPathUtils.getClientIdNodePath(this.destination, clientData.getClientId()), true);
             initRunning();
         } catch (Throwable t) {
-            logger.error(MessageFormat.format("There is an error when execute initRunning method, with destination [{0}].",
-                destination),
-                t);
-
+            logger.error(MessageFormat.format("There is an error when execute initRunning method, with destination [{0}].", destination), t);
             // fixed issue 1220, 针对server节点不工作避免死循环
             if (t instanceof ServerNotFoundException) {
                 try {
@@ -145,7 +143,6 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
                 } catch (InterruptedException e) {
                 }
             }
-
             // 出现任何异常尝试release
             releaseRunning();
             throw new CanalClientException("something goes wrong in initRunning method. ", t);
@@ -154,7 +151,7 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
 
     /**
      * 阻塞等待自己成为active，如果自己成为active，立马返回
-     * 
+     *
      * @throws InterruptedException
      */
     public void waitForActive() throws InterruptedException {
@@ -175,8 +172,8 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
             boolean result = isMine(activeData.getAddress());
             if (!result) {
                 logger.warn("canal is running in [{}] , but not in [{}]",
-                    activeData.getAddress(),
-                    clientData.getAddress());
+                        activeData.getAddress(),
+                        clientData.getAddress());
             }
             return result;
         } catch (ZkNoNodeException e) {
@@ -217,8 +214,7 @@ public class ClientRunningMonitor extends AbstractCanalLifeCycle {
             String address = connectAddress.getAddress().getHostAddress() + ":" + connectAddress.getPort();
             this.clientData.setAddress(address);
 
-            String path = ZookeeperPathUtils.getDestinationClientRunning(this.destination,
-                this.clientData.getClientId());
+            String path = ZookeeperPathUtils.getDestinationClientRunning(this.destination, this.clientData.getClientId());
             // 序列化
             byte[] bytes = JsonUtils.marshalToByte(clientData);
             zkClient.writeData(path, bytes);

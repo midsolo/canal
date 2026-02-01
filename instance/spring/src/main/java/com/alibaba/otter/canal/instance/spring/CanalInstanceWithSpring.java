@@ -16,22 +16,21 @@ import com.alibaba.otter.canal.store.CanalEventStore;
 import com.alibaba.otter.canal.store.model.Event;
 
 /**
- * 基于spring容器启动canal实例，方便独立于manager启动
- * 
- * @author jianghang 2012-7-12 下午01:21:26
- * @author zebin.xuzb
- * @version 1.0.0
+ * 基于spring容器启动canal实例，方便独立于manager启动。当我们配置加载方式
+ * 为spring时，创建的CanalInstance实例类型都是CanalInstanceWithSpring。
+ * canal将会寻找本地的spring配置文件来创建instance实例。
  */
 public class CanalInstanceWithSpring extends AbstractCanalInstance {
-
     private static final Logger logger = LoggerFactory.getLogger(CanalInstanceWithSpring.class);
 
+    @Override
     public void start() {
-        logger.info("start CannalInstance for {}-{} ", new Object[] { 1, destination });
+        logger.info("start CanalInstance for {}-{} ", new Object[] { 1, destination });
+        // 调用父类启动Canal实例
         super.start();
     }
 
-    // ======== setter ========
+    // =====提供了一些set方法为instance的组成模块赋值======
 
     public void setDestination(String destination) {
         this.destination = destination;

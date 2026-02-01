@@ -21,15 +21,18 @@
 			<artifactId>canal.protocol</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+
+        <!-- aviator是一个开源的、高性能、轻量级的Java语言实现的表达式求值引擎 -->
 		<dependency>
 			<groupId>com.googlecode.aviator</groupId>
 			<artifactId>aviator</artifactId>
 		</dependency>
+        <!-- oro全称为Jakarta ORO，是最全面以及优化得最好的正则表达式API之一 -->
 		<dependency>
 			<groupId>oro</groupId>
 			<artifactId>oro</artifactId>
 		</dependency>
-		<!-- test dependency -->
+
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>

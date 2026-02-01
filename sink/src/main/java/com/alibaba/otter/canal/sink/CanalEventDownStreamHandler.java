@@ -3,25 +3,27 @@ package com.alibaba.otter.canal.sink;
 import com.alibaba.otter.canal.common.CanalLifeCycle;
 
 /**
- * 处理下sink时的数据流
- * 
- * @author jianghang 2012-7-31 下午03:06:26
- * @version 1.0.0
+ * 定义CanalSink中事件处理的回调点，这些回调允许在事件提交到store组件存储之前、
+ * 成功存储之后或存储已满重试期间执行自定义逻辑。这种机制允许Canal Sink中进行
+ * 灵活可扩展的事件处理，使开发人员能够在事件生命周期的关键点注入自定义逻辑。
  */
 public interface CanalEventDownStreamHandler<T> extends CanalLifeCycle {
 
     /**
-     * 提交到store之前做一下处理，允许替换Event
+     * 在事件提交到CanalEventStore之前被调用，允许对事件进行预处理或修改。
+     * 例如：HeartBeatEntryEventHandler使用before方法过滤HEARTBEAT事件。
      */
-    public T before(T events);
+    T before(T events);
 
     /**
-     * store处于full后，retry时处理做一下处理
+     * 当CanalEventStore已满且put操作失败时被调用，允许对事件进行重试处理，
+     * 它用于处理事件无法立即存储的场景。
      */
-    public T retry(T events);
+    T retry(T events);
 
     /**
-     * 提交store成功后做一下处理
+     * 在事件成功提交到CanalEventStore之后被调用，它可用于后置处理或通知。
      */
-    public T after(T events);
+    T after(T events);
+
 }

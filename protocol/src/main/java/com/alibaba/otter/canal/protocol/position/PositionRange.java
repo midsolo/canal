@@ -7,14 +7,11 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import com.alibaba.otter.canal.common.utils.CanalToStringStyle;
 
 /**
- * 描述一个position范围
- * 
- * @author jianghang 2012-7-10 下午05:28:38
- * @version 1.0.0
+ * 描述一个position范围，start表示第一个位置，end表示最后一个位置。
  */
 public class PositionRange<T extends Position> implements Serializable {
-
     private static final long serialVersionUID = -9162037079815694784L;
+
     private T                 start;
     // add by ljh at 2012-09-05，用于记录一个可被ack的位置，保证每次提交到cursor中的位置是一个完整事务的结束
     private T                 ack;

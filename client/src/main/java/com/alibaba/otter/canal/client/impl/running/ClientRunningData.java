@@ -1,15 +1,12 @@
 package com.alibaba.otter.canal.client.impl.running;
 
 /**
- * client running状态信息
- * 
- * @author jianghang 2012-11-22 下午03:41:50
- * @version 1.0.0
+ * 客户端运行状态
  */
 public class ClientRunningData {
 
-    private short   clientId;
-    private String  address;
+    private short clientId;
+    private String address;
     private boolean active = true;
 
     public short getClientId() {
